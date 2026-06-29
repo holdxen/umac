@@ -8,7 +8,7 @@ pub trait UMac<const KEY: usize, const TAG: usize> {
     const TAG_LEN: usize = TAG;
     fn new(key: [u8; KEY]) -> Self;
     fn update(&mut self, data: &[u8]);
-    fn finalize(self, nonce: [u8; 8]) -> [u8; TAG];
+    fn finalize(&mut self, nonce: [u8; 8]) -> [u8; TAG];
 }
 
 pub struct UMac64 {
@@ -43,7 +43,7 @@ impl UMac<16, 8> for UMac64 {
         }
     }
 
-    fn finalize(self, nonce: [u8; 8]) -> [u8; Self::TAG_LEN] {
+    fn finalize(&mut self, nonce: [u8; 8]) -> [u8; Self::TAG_LEN] {
         unsafe {
             let mut tag = [0u8; Self::TAG_LEN];
             let ret = ffi::umac_final(self.ctx, tag.as_mut_ptr() as _, nonce.as_ptr() as _);
@@ -84,7 +84,7 @@ impl UMac<16, 16> for UMac128 {
         }
     }
 
-    fn finalize(self, nonce: [u8; 8]) -> [u8; Self::TAG_LEN] {
+    fn finalize(&mut self, nonce: [u8; 8]) -> [u8; Self::TAG_LEN] {
         unsafe {
             let mut tag = [0u8; Self::TAG_LEN];
             let ret = ffi::umac128_final(self.ctx, tag.as_mut_ptr() as _, nonce.as_ptr() as _);
