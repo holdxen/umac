@@ -3,23 +3,17 @@ mod ffi {
     include!(concat!(env!("OUT_DIR"), "/umac.rs"));
 }
 
-pub trait UMac {
-    const KEY_LEN: usize;
-    const TAG_LEN: usize;
+pub trait UMac<const KEY: usize, const TAG: usize> {
+    const KEY_LEN: usize = KEY;
+    const TAG_LEN: usize = TAG;
+    fn new(key: [u8; KEY]) -> Self;
+    fn update(&mut self, data: &[u8]);
+    fn finalize(self, nonce: [u8; 8]) -> [u8; TAG];
 }
 
 pub struct UMac64 {
     ctx: *mut ffi::umac_ctx,
 }
-
-unsafe impl Send for UMac64 {}
-unsafe impl Sync for UMac64 {}
-
-impl UMac for UMac64 {
-    const KEY_LEN: usize = 16;
-    const TAG_LEN: usize = 8;
-}
-
 impl Drop for UMac64 {
     fn drop(&mut self) {
         unsafe {
@@ -28,16 +22,20 @@ impl Drop for UMac64 {
         }
     }
 }
+unsafe impl Send for UMac64 {}
+unsafe impl Sync for UMac64 {}
 
-impl UMac64 {
-    pub fn new(mut key: [u8; Self::KEY_LEN]) -> Self {
+impl UMac<16, 8> for UMac64 {
+    const KEY_LEN: usize = 16;
+    const TAG_LEN: usize = 8;
+    fn new(mut key: [u8; Self::KEY_LEN]) -> Self {
         unsafe {
             let ctx = ffi::umac_new(key.as_mut_ptr() as _);
             Self { ctx }
         }
     }
 
-    pub fn update(&mut self, data: &[u8]) {
+    fn update(&mut self, data: &[u8]) {
         unsafe {
             let ret =
                 ffi::umac_update(self.ctx, data.as_ptr() as _, data.len().try_into().unwrap());
@@ -45,7 +43,7 @@ impl UMac64 {
         }
     }
 
-    pub fn finalize(self, nonce: [u8; 8]) -> [u8; Self::TAG_LEN] {
+    fn finalize(self, nonce: [u8; 8]) -> [u8; Self::TAG_LEN] {
         unsafe {
             let mut tag = [0u8; Self::TAG_LEN];
             let ret = ffi::umac_final(self.ctx, tag.as_mut_ptr() as _, nonce.as_ptr() as _);
@@ -62,12 +60,6 @@ pub struct UMac128 {
 unsafe impl Send for UMac128 {}
 unsafe impl Sync for UMac128 {}
 
-impl UMac for UMac128 {
-    const KEY_LEN: usize = 16;
-
-    const TAG_LEN: usize = 16;
-}
-
 impl Drop for UMac128 {
     fn drop(&mut self) {
         unsafe {
@@ -76,16 +68,15 @@ impl Drop for UMac128 {
         }
     }
 }
-
-impl UMac128 {
-    pub fn new(mut key: [u8; Self::KEY_LEN]) -> Self {
+impl UMac<16, 16> for UMac128 {
+    fn new(mut key: [u8; Self::KEY_LEN]) -> Self {
         unsafe {
             let ctx = ffi::umac128_new(key.as_mut_ptr() as _);
             Self { ctx }
         }
     }
 
-    pub fn update(&mut self, data: &[u8]) {
+    fn update(&mut self, data: &[u8]) {
         unsafe {
             let ret =
                 ffi::umac128_update(self.ctx, data.as_ptr() as _, data.len().try_into().unwrap());
@@ -93,7 +84,7 @@ impl UMac128 {
         }
     }
 
-    pub fn finalize(self, nonce: [u8; 8]) -> [u8; Self::TAG_LEN] {
+    fn finalize(self, nonce: [u8; 8]) -> [u8; Self::TAG_LEN] {
         unsafe {
             let mut tag = [0u8; Self::TAG_LEN];
             let ret = ffi::umac128_final(self.ctx, tag.as_mut_ptr() as _, nonce.as_ptr() as _);
